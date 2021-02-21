@@ -46,6 +46,9 @@ class DownloadThread(threading.Thread):
                 print('Unexpected FileExistsError while creating data directory:', error)
         except OSError as error:
             print('Unexpected OSError while creating data directory:', error)
+
+        self.getConversionRate()
+
         numberOfStocks = len(self.portfolio)
         for count, investment in enumerate(self.portfolio):
             if not self.halt:
@@ -60,6 +63,11 @@ class DownloadThread(threading.Thread):
                 self.downloadingWindow.setProgress(((1 + count) / numberOfStocks) * 100, investment.code)
                 self.downloadingFinished.sig.emit(investment)
         self.downloadingWindow.hide()
+
+    def getConversionRate(self):
+        url = 'https://www.freeforexapi.com/api/live?pairs=USDAUD'
+        self.fatController.usdToAudConversion = float(requests.get(url=url).json()['rates']['USDAUD']['rate'])
+        self.fatController.model.writeUsdToAudConversionValue()
 
     def getShare(self, today, investment):
         url = 'https://eodhistoricaldata.com/api/eod/' + \
@@ -106,10 +114,7 @@ class DownloadThread(threading.Thread):
               '&fmt=json'
         response = requests.get(url=url).json()
 
-        url = 'https://www.freeforexapi.com/api/live?pairs=USDAUD'
-        self.fatController.usdToAudConversion = float(requests.get(url=url).json()['rates']['USDAUD']['rate'])
-        investment.conversion = self.fatController.usdToAudConversion
-        investment.livePrice = float(response['close']) * investment.conversion if response['close'] != 'NA' else investment.priceHistory['close'][-1]
+        investment.livePrice = float(response['close']) * self.fatController.usdToAudConversion if response['close'] != 'NA' else investment.priceHistory['close'][-1]
 
     def getCoinSpot(self):
         api_key = '7a95f252'
